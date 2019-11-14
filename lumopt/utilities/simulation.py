@@ -3,6 +3,7 @@
 
 import lumapi
 
+
 class Simulation(object):
     """
         Object to manage the FDTD CAD. 

@@ -99,22 +99,29 @@ class GradientFields(object):
             result = ( 2.0 * sp.constants.epsilon_0 * (eps_in - eps_out) * np.sum(E_parallel_forward * E_parallel_adjoint) 
                       + (1.0/eps_out - 1.0/eps_in) / sp.constants.epsilon_0 * np.sum(D_perp_forward * D_perp_adjoint) )
             return np.real(result)
-        
+
         return gradient_field
 
     @staticmethod
-    def spatial_gradient_integral_on_cad(sim, forward_fields, adjoint_fields, wl_scaling_factor):
+    def spatial_gradient_integral_on_cad(sim,
+                                         forward_fields,
+                                         adjoint_fields,
+                                         wl_scaling_factor
+                                         ):
         lumapi.putMatrix(sim.fdtd.handle, "wl_scaling_factor", wl_scaling_factor)
         sim.fdtd.eval("gradient_fields = 2.0 * eps0 * {0}.E.E * {1}.E.E;".format(forward_fields, adjoint_fields) +
                       "num_opt_params = length(d_epses);" +
                       "num_wl_pts = length({0}.E.lambda);".format(forward_fields) +
                       "partial_fom_derivs_vs_lambda = matrix(num_wl_pts, num_opt_params);" +
-                      "for(param_idx = [1:num_opt_params]){"+
+                      "for(param_idx = [1:num_opt_params]){" +
                       "    for(wl_idx = [1:num_wl_pts]){" +
                       "        spatial_integrand = pinch(sum(gradient_fields(:,:,:,wl_idx,:) * wl_scaling_factor(wl_idx) * d_epses{param_idx}, 5), 4);" +
-                      "        partial_fom_derivs_vs_lambda(wl_idx, param_idx) = integrate2(spatial_integrand, [1,2,3], {0}.E.x, {0}.E.y, {0}.E.z);".format(forward_fields) +
+                      "        partial_fom_derivs_vs_lambda(wl_idx, param_idx) = integrate2(spatial_integrand, [1,2,3], {0}.E.x, {0}.E.y, {0}.E.z);".format(
+                          forward_fields) +
                       "    }" +
                       "}")
         partial_fom_derivs_vs_lambda = lumapi.getVar(sim.fdtd.handle, 'partial_fom_derivs_vs_lambda')
-        sim.fdtd.eval("clear(param_idx, wl_idx, num_opt_params, num_wl_pts, spatial_integrand, gradient_fields, wl_scaling_factor, partial_fom_derivs_vs_lambda, d_epses, {0}, {1});".format(forward_fields, adjoint_fields))
+        sim.fdtd.eval(
+            "clear(param_idx, wl_idx, num_opt_params, num_wl_pts, spatial_integrand, gradient_fields, wl_scaling_factor, partial_fom_derivs_vs_lambda, d_epses, {0}, {1});".format(
+                forward_fields, adjoint_fields))
         return partial_fom_derivs_vs_lambda

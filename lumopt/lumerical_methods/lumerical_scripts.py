@@ -7,9 +7,37 @@ import scipy.constants
 import lumapi
 from lumopt.utilities.fields import Fields, FieldsNoInterp
 
-def get_fields_on_cad(fdtd, monitor_name, field_result_name, get_eps, get_D, get_H, nointerpolation, unfold_symmetry = True):
+
+def get_fields_on_cad(fdtd,
+                      monitor_name: str,
+                      field_result_name: str,
+                      get_eps: bool,
+                      get_D: bool,
+                      get_H: bool,
+                      nointerpolation: bool,
+                      unfold_symmetry: bool = True,
+                      ) -> None:
+    """
+
+    Parameters
+    ----------
+    fdtd
+    monitor_name
+    field_result_name
+    get_eps
+    get_D
+    get_H
+    nointerpolation
+    unfold_symmetry
+
+    Returns
+    -------
+
+    """
     unfold_symmetry_string = "true" if unfold_symmetry else "false"
-    fdtd.eval("options=struct; options.unfold={0};".format(unfold_symmetry_string) + 
+
+    # Get the E field of the monitor
+    fdtd.eval("options=struct; options.unfold={0};".format(unfold_symmetry_string) +
               "{0} = struct;".format(field_result_name) +
               "{0}.E = getresult('{1}','E',options);".format(field_result_name, monitor_name))
 
@@ -31,26 +59,40 @@ def get_fields_on_cad(fdtd, monitor_name, field_result_name, get_eps, get_D, get
             fdtd.eval("{0}.delta.z = 0.0;".format(field_result_name))
 
 
-def get_fields(fdtd, monitor_name, field_result_name, get_eps, get_D, get_H, nointerpolation, unfold_symmetry = True, on_cad_only = False):
+def get_fields(fdtd,
+               monitor_name,
+               field_result_name,
+               get_eps,
+               get_D,
+               get_H,
+               nointerpolation,
+               unfold_symmetry=True,
+               on_cad_only=False
+               ):
 
     get_fields_on_cad(fdtd, monitor_name, field_result_name, get_eps, get_D, get_H, nointerpolation, unfold_symmetry)
 
-    ## If required, we now transfer the field data to Python and package it up 
+    # If required, we now transfer the field data to Python and package it up
     if not on_cad_only:
         fields_dict = lumapi.getVar(fdtd.handle, field_result_name)
 
     if get_eps:
         if fdtd.getnamednumber('varFDTD') == 1:
-            if 'index_x' in fields_dict['index'] and 'index_y' in fields_dict['index'] and not 'index_z' in fields_dict['index']: # varFDTD TE simulation
-                fields_dict['index']['index_z'] = fields_dict['index']['index_x']*0.0 + 1.0
-            elif not 'index_x' in fields_dict['index'] and not 'index_y' in fields_dict['index'] and 'index_z' in fields_dict['index']: # varFDTD TM simulation
-                fields_dict['index']['index_x'] = fields_dict['index']['index_z']*0.0 + 1.0
+            if ('index_x' in fields_dict['index']
+                    and 'index_y' in fields_dict['index']
+                    and 'index_z' not in fields_dict['index']):  # varFDTD TE simulation
+                fields_dict['index']['index_z'] = fields_dict['index']['index_x'] * 0.0 + 1.0
+            elif ('index_x' not in fields_dict['index']
+                  and 'index_y' not in fields_dict['index']
+                  and 'index_z' in fields_dict['index']):  # varFDTD TM simulation
+                fields_dict['index']['index_x'] = fields_dict['index']['index_z'] * 0.0 + 1.0
                 fields_dict['index']['index_y'] = fields_dict['index']['index_x']
-        assert 'index_x' in fields_dict['index'] and 'index_y' in fields_dict['index'] and 'index_z' in fields_dict['index']
-        fields_eps = np.stack((np.power(fields_dict['index']['index_x'], 2), 
-                               np.power(fields_dict['index']['index_y'], 2), 
-                               np.power(fields_dict['index']['index_z'], 2)), 
-                               axis = -1)
+        assert 'index_x' in fields_dict['index'] and 'index_y' in fields_dict['index'] and 'index_z' in fields_dict[
+            'index']
+        fields_eps = np.stack((np.power(fields_dict['index']['index_x'], 2),
+                               np.power(fields_dict['index']['index_y'], 2),
+                               np.power(fields_dict['index']['index_z'], 2)),
+                              axis=-1)
     else:
         fields_eps = None
 
@@ -60,12 +102,22 @@ def get_fields(fdtd, monitor_name, field_result_name, get_eps, get_D, get_H, noi
 
     if nointerpolation:
         deltas = [fields_dict['delta']['x'], fields_dict['delta']['y'], fields_dict['delta']['z']]
-        return FieldsNoInterp(fields_dict['E']['x'], fields_dict['E']['y'], fields_dict['E']['z'], fields_dict['E']['lambda'], deltas, fields_dict['E']['E'], fields_D, fields_eps, fields_H)
+        return FieldsNoInterp(fields_dict['E']['x'],
+                              fields_dict['E']['y'],
+                              fields_dict['E']['z'],
+                              fields_dict['E']['lambda'],
+                              deltas,
+                              fields_dict['E']['E'],
+                              fields_D,
+                              fields_eps,
+                              fields_H)
     else:
-        return Fields(fields_dict['E']['x'], fields_dict['E']['y'], fields_dict['E']['z'], fields_dict['E']['lambda'], fields_dict['E']['E'], fields_D, fields_eps, fields_H)
+        return Fields(fields_dict['E']['x'], fields_dict['E']['y'], fields_dict['E']['z'], fields_dict['E']['lambda'],
+                      fields_dict['E']['E'], fields_D, fields_eps, fields_H)
 
-def set_spatial_interp(fdtd,monitor_name,setting):
-    script='select("{}");set("spatial interpolation","{}");'.format(monitor_name,setting)
+
+def set_spatial_interp(fdtd, monitor_name, setting):
+    script = 'select("{}");set("spatial interpolation","{}");'.format(monitor_name, setting)
     fdtd.eval(script)
 
 def get_eps_from_sim(fdtd, monitor_name = 'opt_fields', unfold_symmetry = True):

@@ -5,7 +5,12 @@ from scipy.interpolate import RegularGridInterpolator
 import numpy as np
 
 
-def wrapped_GridInterpolator(points, values, method='linear', bounds_error=True, fill_value=float('nan')):
+def wrapped_GridInterpolator(points,
+                             values,
+                             method='linear',
+                             bounds_error=True,
+                             fill_value=float('nan')
+                             ):
     '''This is a wrapper around Scipy's RegularGridInterpolator so that it can deal with entries of 1 dimension
 
     Original doc:
