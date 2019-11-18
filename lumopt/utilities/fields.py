@@ -207,9 +207,10 @@ class FieldsNoInterp(Fields):
     @staticmethod
     def process_array_shape(input):
         if np.isscalar(input) or not any(input.shape):
-            np.array([input])
+            return np.array([input])
         else:
-            input.flatten()
+            return input.flatten()
+
 
     def make_field_interpolation_object_nointerp(self, F):
         if (F.shape[3] == 1) and (len(self.wl) > 1):

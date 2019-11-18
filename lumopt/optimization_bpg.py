@@ -17,7 +17,7 @@ from lumopt.figures_of_merit.modematch import ModeMatch
 from lumopt.utilities.plotter import Plotter
 from lumopt.lumerical_methods.lumerical_scripts import get_fields
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from BPG.lumericalAPI.geometry_manager import GeometryManager
@@ -34,37 +34,47 @@ class SuperOptimization(object):
         :param optimizations: list of co-optimizations (each of class Optimization). 
     """
 
-    def __init__(self, optimizations):
-        self.optimizations = optimizations
+    def __init__(self,
+                 optimizations: List["Optimization"],
+                 ):
+        self.optimizations: List["Optimization"] = optimizations
+        self.optimizer = None
 
-    def __add__(self, other):
+    def __add__(self,
+                other: "Optimization",
+                ):
         optimizations = [self, other]
         return SuperOptimization(optimizations)
 
-    def initialize(self, start_params=None, bounds=None):
+    def initialize(self,
+                   start_params=None,
+                   bounds=None,
+                   signs=None):
 
         print('Initializing super optimization')
 
+        if signs is None:
+            signs = [1] * len(self.optimizations)
         self.optimizer = copy.deepcopy(self.optimizations[0].optimizer)
 
         for optimization in self.optimizations:
             optimization.initialize()
 
         if start_params is None:
-            start_params = self.optimizations[0].geometry.get_current_params()
+            start_params = self.optimizations[0].geometry_manager.get_current_params()
         if bounds is None:
-            bounds = np.array(self.optimizations[0].geometry.bounds)
+            bounds = np.array(self.optimizations[0].geometry_manager.get_bounds())
 
         def callable_fom(params):
             fom = 0
-            for optimization in self.optimizations:
-                fom += optimization.callable_fom(params)
+            for ind, my_optimization in enumerate(self.optimizations):
+                fom += signs[ind] * my_optimization.callable_fom(params)
             return fom
 
         def callable_jac(params):
             jac = 0
-            for optimization in self.optimizations:
-                jac += np.array(optimization.callable_jac(params))
+            for ind, my_optimization in enumerate(self.optimizations):
+                jac += signs[ind] * np.array(my_optimization.callable_jac(params))
             return jac
 
         def plotting_function():
@@ -77,8 +87,10 @@ class SuperOptimization(object):
                                       bounds=bounds,
                                       plotting_function=plotting_function)
 
-    def run(self):
-        self.initialize()
+    def run(self,
+            signs=None,
+            ):
+        self.initialize(signs=signs)
         self.plotter = self.optimizations[0].init_plotter()
 
         if self.plotter.movie:
@@ -118,8 +130,7 @@ class Optimization(SuperOptimization):
                  base_script,
                  wavelengths,
                  fom,
-                 geometry_manager:
-                 "GeometryManager",
+                 geometry_manager: "GeometryManager",
                  optimizer,
                  use_var_fdtd=False,
                  hide_fdtd_cad=False,
@@ -137,7 +148,7 @@ class Optimization(SuperOptimization):
         self.use_deps = bool(use_deps)
         self.plot_history = bool(plot_history)
         self.store_all_simulations = store_all_simulations
-        self.unfold_symmetry = False  # TODO
+        self.unfold_symmetry = True  # TODO
         # self.unfold_symmetry = geometry_manager.unfold_symmetry
 
         if self.use_deps:
@@ -296,7 +307,7 @@ class Optimization(SuperOptimization):
 
         get_eps = not self.use_deps
         get_D = not self.use_deps
-        nointerpolation = not True  # False  # TODO  self.geometry_manager.use_interpolation()
+        nointerpolation = not True ## False  # TODO  self.geometry_manager.use_interpolation()
 
         # < JN: Try on CAD
         self.adjoint_fields = get_fields(self.sim.fdtd,
@@ -374,6 +385,9 @@ class Optimization(SuperOptimization):
         #         fom_partial_derivs_vs_wl = self.geometry_manager.calculate_gradients(self.gradient_fields)
         #         self.gradients = self.fom.fom_gradient_wavelength_integral(fom_partial_derivs_vs_wl,
         #                                                                    self.forward_fields.wl)
+
+
+
         return self.gradients
 
     @staticmethod

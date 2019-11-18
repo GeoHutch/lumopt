@@ -10,14 +10,17 @@ import lumapi
 from lumopt.utilities.wavelengths import Wavelengths
 
 """ Helper function to determine if a variable can be converted to an integer """
+
+
 def is_int(x):
-    try: 
+    try:
         int(x)
         return True
     except ValueError:
         return False
-class ModeMatch(object):
 
+
+class ModeMatch(object):
     """ Calculates the figure of merit from an overlap integral between the fields recorded by a field monitor and the slected mode.
         A mode expansion monitor is added to the field monitor to calculate the overlap result, which appears as T_forward in the 
         list of mode expansion monitor results. The T_forward result is described in the following page:
@@ -39,7 +42,13 @@ class ModeMatch(object):
         :param norm_p:         exponent of the p-norm used to generate the figure of merit; use to generate the FOM.
     """
 
-    def __init__(self, monitor_name, mode_number, direction, multi_freq_src = False, target_T_fwd = lambda wl: np.ones(wl.size), norm_p = 1):
+    def __init__(self,
+                 monitor_name,
+                 mode_number,
+                 direction,
+                 multi_freq_src=False,
+                 target_T_fwd=lambda wl: np.ones(wl.size),
+                 norm_p=1):
         self.monitor_name = str(monitor_name)
         if not self.monitor_name:
             raise UserWarning('empty monitor name.')
@@ -50,7 +59,7 @@ class ModeMatch(object):
         if is_int(mode_number):
             self.mode_number = int(mode_number)
             if self.mode_number <= 0:
-	            raise UserWarning('mode number should be positive.')
+                raise UserWarning('mode number should be positive.')
         else:
             self.mode_number = mode_number
         self.direction = str(direction)
@@ -59,7 +68,8 @@ class ModeMatch(object):
             raise UserWarning('invalid propagation direction.')
         target_T_fwd_result = target_T_fwd(np.linspace(0.1e-6, 10.0e-6, 1000))
         if target_T_fwd_result.size != 1000:
-            raise UserWarning('target transmission must return a flat vector with the requested number of wavelength samples.')
+            raise UserWarning(
+                'target transmission must return a flat vector with the requested number of wavelength samples.')
         elif np.any(target_T_fwd_result.min() < 0.0) or np.any(target_T_fwd_result.max() > 1.0):
             raise UserWarning('target transmission must always return numbers between zero and one.')
         else:
@@ -73,7 +83,8 @@ class ModeMatch(object):
 
         ModeMatch.add_mode_expansion_monitor(sim, self.monitor_name, self.mode_expansion_monitor_name, self.mode_number)
         adjoint_injection_direction = 'Backward' if self.direction == 'Forward' else 'Forward'
-        ModeMatch.add_mode_source(sim, self.monitor_name, self.adjoint_source_name, adjoint_injection_direction, self.mode_number, self.multi_freq_src)
+        ModeMatch.add_mode_source(sim, self.monitor_name, self.adjoint_source_name, adjoint_injection_direction,
+                                  self.mode_number, self.multi_freq_src)
 
     def make_forward_sim(self, sim):
         sim.fdtd.setnamed(self.adjoint_source_name, 'enabled', False)
@@ -82,11 +93,11 @@ class ModeMatch(object):
         sim.fdtd.setnamed(self.adjoint_source_name, 'enabled', True)
 
     def check_monitor_alignment(self, sim):
-      
+
         ## Here, we check that the FOM_monitor is properly aligned with the mesh
         if sim.fdtd.getnamednumber(self.monitor_name) != 1:
             raise UserWarning('monitor could not be found or the specified name is not unique.')
-        
+
         # Get the orientation
         monitor_type = sim.fdtd.getnamed(self.monitor_name, 'monitor type')
 
@@ -109,9 +120,10 @@ class ModeMatch(object):
         ## Check if this is exactly aligned with the simulation mesh. It exactly aligns if we find a point
         ## along the grid which is no more than 'tol' away from the position
         tol = 1e-9
-        if min(abs(grid-monitor_pos)) > tol:
-            print('WARNING: The monitor "{}" is not aligned with the grid. This can introduce small phase errors which sometimes result in inaccurate gradients.'.format(self.monitor_name))
-
+        if min(abs(grid - monitor_pos)) > tol:
+            print(
+                'WARNING: The monitor "{}" is not aligned with the grid. This can introduce small phase errors which sometimes result in inaccurate gradients.'.format(
+                    self.monitor_name))
 
     @staticmethod
     def add_mode_expansion_monitor(sim, monitor_name, mode_expansion_monitor_name, mode):
@@ -136,11 +148,11 @@ class ModeMatch(object):
             for prop_name in props:
                 prop_val = sim.fdtd.getnamed(monitor_name, prop_name)
                 sim.fdtd.setnamed(mode_expansion_monitor_name, prop_name, prop_val)
-            
+
             # select mode
             sim.fdtd.select(mode_expansion_monitor_name)
-           
-            ## If "mode" is an integer, it means that we want a 'user select' mode. Otherwise we try using it as a string directly
+
+            # If "mode" is an integer, it means that we want a 'user select' mode. Otherwise we try using it as a string directly
             if is_int(mode):
                 sim.fdtd.setnamed(mode_expansion_monitor_name, 'mode selection', 'user select')
                 sim.fdtd.updatemodes(mode)
@@ -155,13 +167,13 @@ class ModeMatch(object):
         geometric_props = ['x', 'y', 'z']
         normal = ''
         if monitor_type == '2D X-normal':
-            geometric_props.extend(['y span','z span'])
+            geometric_props.extend(['y span', 'z span'])
             normal = 'x'
         elif monitor_type == '2D Y-normal':
-            geometric_props.extend(['x span','z span'])
+            geometric_props.extend(['x span', 'z span'])
             normal = 'y'
         elif monitor_type == '2D Z-normal':
-            geometric_props.extend(['x span','y span'])
+            geometric_props.extend(['x span', 'y span'])
             normal = 'z'
         elif monitor_type == 'Linear X':
             geometric_props.append('x span')
@@ -176,12 +188,14 @@ class ModeMatch(object):
         return geometric_props, normal
 
     def get_fom(self, sim):
-        trans_coeff = ModeMatch.get_transmission_coefficient(sim, self.direction, self.monitor_name, self.mode_expansion_monitor_name)
+        trans_coeff = ModeMatch.get_transmission_coefficient(sim, self.direction, self.monitor_name,
+                                                             self.mode_expansion_monitor_name)
         self.wavelengths = ModeMatch.get_wavelengths(sim)
         source_power = ModeMatch.get_source_power(sim, self.wavelengths)
         self.T_fwd_vs_wavelength = np.real(trans_coeff * trans_coeff.conj() / source_power)
         self.phase_prefactors = trans_coeff / 4.0 / source_power
-        fom = ModeMatch.fom_wavelength_integral(self.T_fwd_vs_wavelength, self.wavelengths, self.target_T_fwd, self.norm_p)
+        fom = ModeMatch.fom_wavelength_integral(self.T_fwd_vs_wavelength, self.wavelengths, self.target_T_fwd,
+                                                self.norm_p)
         return fom
 
     def get_adjoint_field_scaling(self, sim):
@@ -192,7 +206,7 @@ class ModeMatch(object):
 
     @staticmethod
     def get_wavelengths(sim):
-        return Wavelengths(sim.fdtd.getglobalsource('wavelength start'), 
+        return Wavelengths(sim.fdtd.getglobalsource('wavelength start'),
                            sim.fdtd.getglobalsource('wavelength stop'),
                            sim.fdtd.getglobalmonitor('frequency points')).asarray()
 
@@ -221,13 +235,14 @@ class ModeMatch(object):
             wavelength_range = wavelengths.max() - wavelengths.min()
             assert wavelength_range > 0.0, "wavelength range must be positive."
             T_fwd_integrand = np.power(np.abs(target_T_fwd_vs_wavelength), norm_p) / wavelength_range
-            const_term = np.power(np.trapz(y = T_fwd_integrand, x = wavelengths), 1.0 / norm_p)
+            const_term = np.power(np.trapz(y=T_fwd_integrand, x=wavelengths), 1.0 / norm_p)
             T_fwd_error = np.abs(T_fwd_vs_wavelength.flatten() - target_T_fwd_vs_wavelength)
             T_fwd_error_integrand = np.power(T_fwd_error, norm_p) / wavelength_range
-            error_term = np.power(np.trapz(y = T_fwd_error_integrand, x = wavelengths), 1.0 / norm_p)
+            error_term = np.power(np.trapz(y=T_fwd_error_integrand, x=wavelengths), 1.0 / norm_p)
             fom = const_term - error_term
         else:
-            fom = np.abs(target_T_fwd_vs_wavelength) - np.abs(T_fwd_vs_wavelength.flatten() - target_T_fwd_vs_wavelength)
+            fom = np.abs(target_T_fwd_vs_wavelength) - np.abs(
+                T_fwd_vs_wavelength.flatten() - target_T_fwd_vs_wavelength)
         return fom.real
 
     @staticmethod
@@ -254,7 +269,7 @@ class ModeMatch(object):
             sim.fdtd.setnamed(source_name, 'multifrequency mode calculation', multi_freq_src)
             if multi_freq_src:
                 sim.fdtd.setnamed(source_name, 'frequency points', sim.fdtd.getglobalmonitor('frequency points'))
-        
+
         if is_int(mode):
             sim.fdtd.setnamed(source_name, 'mode selection', 'user select')
             sim.fdtd.select(source_name)
@@ -266,23 +281,27 @@ class ModeMatch(object):
 
     def fom_gradient_wavelength_integral(self, T_fwd_partial_derivs_vs_wl, wl):
         assert np.allclose(wl, self.wavelengths)
-        return ModeMatch.fom_gradient_wavelength_integral_impl(self.T_fwd_vs_wavelength, T_fwd_partial_derivs_vs_wl, self.target_T_fwd(wl).flatten(), self.wavelengths, self.norm_p)
+        return ModeMatch.fom_gradient_wavelength_integral_impl(self.T_fwd_vs_wavelength, T_fwd_partial_derivs_vs_wl,
+                                                               self.target_T_fwd(wl).flatten(), self.wavelengths,
+                                                               self.norm_p)
 
     @staticmethod
-    def fom_gradient_wavelength_integral_impl(T_fwd_vs_wavelength, T_fwd_partial_derivs_vs_wl, target_T_fwd_vs_wavelength, wl, norm_p):
+    def fom_gradient_wavelength_integral_impl(T_fwd_vs_wavelength, T_fwd_partial_derivs_vs_wl,
+                                              target_T_fwd_vs_wavelength, wl, norm_p):
 
         if wl.size > 1:
             assert T_fwd_partial_derivs_vs_wl.shape[1] == wl.size
-            
+
             wavelength_range = wl.max() - wl.min()
             T_fwd_error = T_fwd_vs_wavelength - target_T_fwd_vs_wavelength
             T_fwd_error_integrand = np.power(np.abs(T_fwd_error), norm_p) / wavelength_range
-            const_factor = -1.0 * np.power(np.trapz(y = T_fwd_error_integrand, x = wl), 1.0 / norm_p - 1.0)
+            const_factor = -1.0 * np.power(np.trapz(y=T_fwd_error_integrand, x=wl), 1.0 / norm_p - 1.0)
             integral_kernel = np.power(np.abs(T_fwd_error), norm_p - 1) * np.sign(T_fwd_error) / wavelength_range
-            
+
             ## Implement the trapezoidal integration as a matrix-vector-product for performance reasons
             d = np.diff(wl)
-            quad_weight = np.append(np.append(d[0], d[0:-1]+d[1:]),d[-1])/2 #< There is probably a more elegant way to do this
+            quad_weight = np.append(np.append(d[0], d[0:-1] + d[1:]),
+                                    d[-1]) / 2  # < There is probably a more elegant way to do this
             v = const_factor * integral_kernel * quad_weight
             T_fwd_partial_derivs = T_fwd_partial_derivs_vs_wl.dot(v)
 
@@ -293,6 +312,7 @@ class ModeMatch(object):
             #     T_fwd_partial_deriv = np.take(T_fwd_partial_derivs_vs_wl.transpose(), indices = i, axis = 1)
             #     T_fwd_partial_derivs[i] = const_factor * np.trapz(y = integral_kernel * T_fwd_partial_deriv, x = wl)
         else:
-            T_fwd_partial_derivs = -1.0 * np.sign(T_fwd_vs_wavelength - target_T_fwd_vs_wavelength) * T_fwd_partial_derivs_vs_wl.flatten()
+            T_fwd_partial_derivs = -1.0 * np.sign(
+                T_fwd_vs_wavelength - target_T_fwd_vs_wavelength) * T_fwd_partial_derivs_vs_wl.flatten()
 
         return T_fwd_partial_derivs.flatten().real
